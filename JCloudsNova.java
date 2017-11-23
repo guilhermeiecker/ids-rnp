@@ -18,6 +18,19 @@ import org.jclouds.openstack.nova.v2_0.options.CreateServerOptions.Builder;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Set;
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
+import sun.net.www.http.HttpClient;
 
 import org.jclouds.openstack.neutron.v2.NeutronApi;
 import org.jclouds.openstack.neutron.v2.domain.Network;
@@ -53,6 +66,10 @@ public class JCloudsNova implements Closeable {
                 System.out.println("Listing networks...");
                 jcloudsNova.listNetworks();
               break;
+	      case "listContainers":
+		System.out.println("Listin containers...");
+		jcloudsNova.listContainers();
+	      break;
               case "listSubnets":
                 System.out.println("Listing subnets...");
                 jcloudsNova.listSubnets();
@@ -129,6 +146,67 @@ public class JCloudsNova implements Closeable {
       }
     }
 
+    private void listContainers() throws IOException {
+      String hostpor = "http://localhost:6666/";
+      String version = "v1.32/";
+      String command = "containers/json?";
+
+      Map<String, String> parameters = new HashMap<>();
+      parameters.put("all", "1");
+
+      String urlString = hostpor + version + command + JCloudsNova.getParamsString(parameters);
+
+      URL url = new URL(urlString); // Docker Daemon @ sdnoverlay.wb.land.ufrj
+      HttpURLConnection con = (HttpURLConnection) url.openConnection();
+      con.setRequestMethod("GET");
+      System.out.println("!");
+
+      con.setRequestProperty("Accept-Encoding", "gzip");
+      con.setRequestProperty("User-Agent", "UFRJ-Client (v0.1)");
+
+/*
+      con.setDoOutput(true);
+      DataOutputStream out = new DataOutputStream(con.getOutputStream());
+      out.writeBytes(JCloudsNova.getParamsString(parameters));
+      out.flush();
+      out.close();
+*/     
+//      String msg = con.getResponseMessage();
+
+      BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+      String inputLine;
+      StringBuffer content = new StringBuffer();
+      while ((inputLine = in.readLine()) != null) {
+        content.append(inputLine);
+      }
+      in.close();
+      System.out.println(content);
+
+      con.disconnect();
+    }
+
+    //TODO: Não funciona ainda!!!!!!!!!!!!!!!!!
+    private void createContainer(String name) throws IOException {
+	HttpClient httpClient = HttpClientBuilder.create().build(); //Use this instead 
+	JSONArray a = (JSONArray) parser.parse(new FileReader("c:\\exer4-courses.json"));
+
+	String json = objectMapper.writeValueAsString(someObject);
+	try {
+    		HttpPost request = new HttpPost("http://localhost:6666/v1.32");
+    		StringEntity params =new StringEntity("details={\"name\":\"myname\",\"age\":\"20\"} ");
+    		request.addHeader("content-type", "application/x-www-form-urlencoded");
+    		request.setEntity(params);
+    		HttpResponse response = httpClient.execute(request);
+	}catch (Exception ex) { 
+	}
+
+    //handle exception here
+
+}
+  
+    }
+
+
     public void createServer(String name, String imageRef, String flavorRef, String network) {
       ServerApi serverApi = novaApi.getServerApi(region);
       CreateServerOptions options = CreateServerOptions.Builder.networks(network);
@@ -148,5 +226,21 @@ public class JCloudsNova implements Closeable {
     public void close() throws IOException {
         Closeables.close(novaApi, true);
         Closeables.close(neutronApi, true);
+    }
+
+    private static String getParamsString(Map<String, String> params) throws UnsupportedEncodingException{
+        StringBuilder result = new StringBuilder();
+ 
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+          result.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
+          result.append("=");
+          result.append(URLEncoder.encode(entry.getValue(), "UTF-8"));
+          result.append("&");
+        }
+ 
+        String resultString = result.toString();
+        return resultString.length() > 0
+          ? resultString.substring(0, resultString.length() - 1)
+          : resultString;
     }
 }
