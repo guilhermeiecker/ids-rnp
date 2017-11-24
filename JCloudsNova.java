@@ -1,42 +1,28 @@
-import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Closeables;
-import com.google.inject.Module;
 import org.jclouds.ContextBuilder;
-import org.jclouds.logging.slf4j.config.SLF4JLoggingModule;
+import org.jclouds.http.HttpResponse;
 import org.jclouds.openstack.v2_0.domain.Resource;
 
 import org.jclouds.openstack.nova.v2_0.NovaApi;
-import org.jclouds.openstack.nova.v2_0.domain.Server;
 import org.jclouds.openstack.nova.v2_0.features.ServerApi;
 import org.jclouds.openstack.nova.v2_0.features.ImageApi;
-import org.jclouds.openstack.nova.v2_0.domain.Image;
 import org.jclouds.openstack.nova.v2_0.features.FlavorApi;
-import org.jclouds.openstack.nova.v2_0.domain.Flavor;
 import org.jclouds.openstack.nova.v2_0.options.CreateServerOptions;
-import org.jclouds.openstack.nova.v2_0.options.CreateServerOptions.Builder;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.Set;
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.net.MalformedURLException;
-import java.net.ProtocolException;
-import sun.net.www.http.HttpClient;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import org.jclouds.openstack.neutron.v2.NeutronApi;
 import org.jclouds.openstack.neutron.v2.domain.Network;
 import org.jclouds.openstack.neutron.v2.features.NetworkApi;
-import org.jclouds.openstack.neutron.v2.domain.Network.CreateNetwork;
-import org.jclouds.openstack.neutron.v2.domain.Network.CreateBuilder;
 import org.jclouds.openstack.neutron.v2.domain.Subnet;
 import org.jclouds.openstack.neutron.v2.features.SubnetApi;
 
@@ -50,40 +36,58 @@ public class JCloudsNova implements Closeable {
 
         try {
             switch (args[0]) {
-              case "listServers":
-                System.out.println("Listing servers...");
-                jcloudsNova.listServers();
-              break;
-              case "listImages":
-                System.out.println("Listing images...");
-                jcloudsNova.listImages();
-              break;
-              case "listFlavors":
-                System.out.println("Listing flavors...");
-                jcloudsNova.listFlavors();
-              break;
-              case "listNetworks":
-                System.out.println("Listing networks...");
-                jcloudsNova.listNetworks();
-              break;
-	      case "listContainers":
-		System.out.println("Listin containers...");
-		jcloudsNova.listContainers();
-	      break;
-              case "listSubnets":
-                System.out.println("Listing subnets...");
-                jcloudsNova.listSubnets();
-              break;
-              case "createServer":
-                jcloudsNova.createServer(args[1], args[2], args[3], args[4]);
-              break;
-              case "createNetwork":
-                jcloudsNova.createNetwork(args[1]);
-              break;
-              case "createSubnet":
-                jcloudsNova.createSubnet(args[1], args[2]);
-              break;
-              default: System.out.println("Default");
+                // Openstack Features
+                case "listServers":
+                    System.out.println("Listing servers...");
+                    jcloudsNova.listServers();
+                    break;
+                case "listImages":
+                    System.out.println("Listing images...");
+                    jcloudsNova.listImages();
+                    break;
+                case "listFlavors":
+                    System.out.println("Listing flavors...");
+                    jcloudsNova.listFlavors();
+                    break;
+                case "listNetworks":
+                    System.out.println("Listing networks...");
+                    jcloudsNova.listNetworks();
+                    break;
+                case "listSubnets":
+                    System.out.println("Listing subnets...");
+                    jcloudsNova.listSubnets();
+                    break;
+                case "createServer":
+                    jcloudsNova.createServer(args[1], args[2], args[3], args[4]);
+                    break;
+                case "createNetwork":
+                    jcloudsNova.createNetwork(args[1]);
+                    break;
+                case "createSubnet":
+                    jcloudsNova.createSubnet(args[1], args[2]);
+                    break;
+                // Docker Features
+                case "listContainers":
+                    System.out.println("Listing containers...");
+                    jcloudsNova.listContainers();
+                    break;
+                case "createContainer":
+                    System.out.println("Creating container...");
+                    jcloudsNova.createContainer(args[1]);
+                    break;
+                case "startContainer":
+                    System.out.println("Starting container...");
+                    jcloudsNova.startContainer(args[1]);
+                    break;
+                case "stopContainer":
+                    System.out.println("Stopping container...");
+                    jcloudsNova.stopContainer(args[1]);
+                    break;
+                case "removeContainer":
+                    System.out.println("Removing container...");
+                    jcloudsNova.removeContainer(args[1]);
+                    break;
+                default: System.out.println("Default");
             }
             jcloudsNova.close();
         } catch (Exception e) {
@@ -159,19 +163,9 @@ public class JCloudsNova implements Closeable {
       URL url = new URL(urlString); // Docker Daemon @ sdnoverlay.wb.land.ufrj
       HttpURLConnection con = (HttpURLConnection) url.openConnection();
       con.setRequestMethod("GET");
-      System.out.println("!");
 
       con.setRequestProperty("Accept-Encoding", "gzip");
       con.setRequestProperty("User-Agent", "UFRJ-Client (v0.1)");
-
-/*
-      con.setDoOutput(true);
-      DataOutputStream out = new DataOutputStream(con.getOutputStream());
-      out.writeBytes(JCloudsNova.getParamsString(parameters));
-      out.flush();
-      out.close();
-*/     
-//      String msg = con.getResponseMessage();
 
       BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
       String inputLine;
@@ -185,27 +179,44 @@ public class JCloudsNova implements Closeable {
       con.disconnect();
     }
 
-    //TODO: Não funciona ainda!!!!!!!!!!!!!!!!!
     private void createContainer(String name) throws IOException {
-	HttpClient httpClient = HttpClientBuilder.create().build(); //Use this instead 
-	JSONArray a = (JSONArray) parser.parse(new FileReader("c:\\exer4-courses.json"));
+        String hostpor = "http://localhost:6666/";
+        String version = "v1.32/";
+        String command = "containers/create?";
 
-	String json = objectMapper.writeValueAsString(someObject);
-	try {
-    		HttpPost request = new HttpPost("http://localhost:6666/v1.32");
-    		StringEntity params =new StringEntity("details={\"name\":\"myname\",\"age\":\"20\"} ");
-    		request.addHeader("content-type", "application/x-www-form-urlencoded");
-    		request.setEntity(params);
-    		HttpResponse response = httpClient.execute(request);
-	}catch (Exception ex) { 
-	}
+        Map<String, String> parameters = new HashMap<>();
+        parameters.put("name", name);
 
-    //handle exception here
+        String json = readFile("example2.json", StandardCharsets.UTF_8); //TODO: Checar se esse método funciona para fazer parser do arquivo
 
-}
-  
+        String urlString = hostpor + version + command + JCloudsNova.getParamsString(parameters);
+
+        URL url = new URL(urlString); // Docker Daemon @ sdnoverlay.wb.land.ufrj
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setRequestMethod("POST");
+
+        con.setRequestProperty("Accept-Encoding", "gzip");
+        con.setRequestProperty("User-Agent", "UFRJ-Client (v0.1)");
+        con.setRequestProperty("Content-Type", "application/json");
+        con.setDoOutput(true);
+
+        // Send JSON
+        OutputStream os = con.getOutputStream();
+        os.write(json.getBytes("UTF-8"));
+        os.close();
+
+        // Read repsonse
+        BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+        String inputLine;
+        StringBuffer content = new StringBuffer();
+        while ((inputLine = in.readLine()) != null) {
+            content.append(inputLine);
+        }
+        in.close();
+        System.out.println(content);
+
+        con.disconnect();
     }
-
 
     public void createServer(String name, String imageRef, String flavorRef, String network) {
       ServerApi serverApi = novaApi.getServerApi(region);
@@ -223,6 +234,78 @@ public class JCloudsNova implements Closeable {
       subnetApi.create(Subnet.CreateSubnet.createBuilder(network, cidr).ipVersion(4).build());
     }
 
+    private void startContainer(String name) throws IOException {
+        String hostpor = "http://localhost:6666/";
+        String version = "v1.32/";
+        String command = "containers/";
+
+        String urlString = hostpor + version + command + name + "/start";
+
+        URL url = new URL(urlString); // Docker Daemon @ sdnoverlay.wb.land.ufrj
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setRequestMethod("POST");
+
+        // Read repsonse
+        BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+        String inputLine;
+        StringBuffer content = new StringBuffer();
+        while ((inputLine = in.readLine()) != null) {
+            content.append(inputLine);
+        }
+        in.close();
+        System.out.println(content);
+
+        con.disconnect();
+    }
+
+    private void stopContainer(String name) throws IOException {
+        String hostpor = "http://localhost:6666/";
+        String version = "v1.32/";
+        String command = "containers/";
+
+        String urlString = hostpor + version + command + name + "/stop";
+
+        URL url = new URL(urlString); // Docker Daemon @ sdnoverlay.wb.land.ufrj
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setRequestMethod("POST");
+
+        // Read repsonse
+        BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+        String inputLine;
+        StringBuffer content = new StringBuffer();
+        while ((inputLine = in.readLine()) != null) {
+            content.append(inputLine);
+        }
+        in.close();
+        System.out.println(content);
+
+        con.disconnect();
+    }
+
+    private void removeContainer(String name) throws IOException {
+        String hostpor = "http://localhost:6666/";
+        String version = "v1.32/";
+        String command = "containers/";
+
+        String urlString = hostpor + version + command + name;
+
+        URL url = new URL(urlString); // Docker Daemon @ sdnoverlay.wb.land.ufrj
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setRequestMethod("DELETE");
+
+        // Read repsonse
+        BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+        String inputLine;
+        StringBuffer content = new StringBuffer();
+        while ((inputLine = in.readLine()) != null) {
+            content.append(inputLine);
+        }
+        in.close();
+        System.out.println(content);
+
+        con.disconnect();
+    }
+
     public void close() throws IOException {
         Closeables.close(novaApi, true);
         Closeables.close(neutronApi, true);
@@ -230,17 +313,22 @@ public class JCloudsNova implements Closeable {
 
     private static String getParamsString(Map<String, String> params) throws UnsupportedEncodingException{
         StringBuilder result = new StringBuilder();
- 
+
         for (Map.Entry<String, String> entry : params.entrySet()) {
           result.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
           result.append("=");
           result.append(URLEncoder.encode(entry.getValue(), "UTF-8"));
           result.append("&");
         }
- 
+
         String resultString = result.toString();
         return resultString.length() > 0
           ? resultString.substring(0, resultString.length() - 1)
           : resultString;
+    }
+
+    private static String readFile(String path, Charset encoding) throws IOException {
+      byte[] encoded = Files.readAllBytes(Paths.get(path));
+      return new String(encoded, encoding);
     }
 }
