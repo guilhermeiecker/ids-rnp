@@ -242,6 +242,58 @@ public class JCloudsNova implements Closeable {
       subnetApi.create(Subnet.CreateSubnet.createBuilder(network, cidr).ipVersion(4).build());
     }
 
+    public void showSubnet(String netId){
+        NetworkApi networkApi = neutronApi.getNetworkApi("RegionOne");
+        SubnetApi subnetApi = neutronApi.getSubnetApi("RegionOne");
+        //System.out.println(netId);
+        for (Network network : networkApi.list().concat()){
+            //System.out.println(network.getId());
+            if (network.getId().equals(netId)){
+                //System.out.println("Entra aqui sim!");
+                Set<String> subnets = network.getSubnets();
+                for (Subnet subnet : subnetApi.list().concat()){
+                    //System.out.println(subnets);
+                    //System.out.println(subnet.getId());
+                    for (String focus : subnets){
+                        if (subnet.getId().equals(focus)){
+                            System.out.println("ID: "+subnet.getId()+"\n CIDR: "+subnet.getCidr()+
+                                                "\n Gateway "+subnet.getGatewayIp()+"\n DHCP: "+subnet.getEnableDhcp()+
+                                                "\n Network: "+network.getName());
+                        }
+
+                    }
+                }
+            }
+            /*else{
+                        System.out.println("Não, não entra não!");
+                }*/
+        }
+    }
+
+    public void createPort(String netId){
+        NetworkApi netApi = neutronApi.getNetworkApi("RegionOne");
+        PortApi portApi = neutronApi.getPortApi("RegionOne");
+
+        Port port = portApi.create(Port.createBuilder(netId).build())
+    }
+
+    public void associateNetwork(String serverId, String netId){
+        NetworkApi netApi = neutronApi.getNetworkApi("RegionOne");
+        ServerApi serverApi = novaApi.getServerApi("RegionOne");
+
+        AttachInterfaceApi attachApi = novaApi.getAttachInterfaceApi("RegionOne");
+
+        self.createPort(netId);
+        InterfaceAttachment attachment = attachApi.create(InterfaceAttachment.());
+    }
+    /*
+    public void delSubnet(){
+    }
+
+    public void delNetwork(){
+    }*/
+
+
     private void startContainer(String name) throws IOException {
         String hostpor = "http://localhost:6666/";
         String version = "v1.32/";
