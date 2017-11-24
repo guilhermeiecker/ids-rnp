@@ -224,9 +224,17 @@ public class JCloudsNova implements Closeable {
       serverApi.create(name, imageRef, flavorRef, options);
     }
 
-    public void createNetwork(String name) {
+    /*public void createNetwork(String name) {
       NetworkApi networkApi = neutronApi.getNetworkApi(region);
       networkApi.create(Network.CreateNetwork.createBuilder(name).build());
+    }*/
+
+    public void createNetwork(String name, int tag, String physical){
+    	NetworkApi netApi = neutronApi.getNetworkApi("RegionOne");
+        Network network = netApi.create(Network.createBuilder(name).
+				external(true).networkType(NetworkType.VLAN).
+				segmentationId(tag).physicalNetworkName(physical).build());
+         //assertNotNull(network);
     }
 
     public void createSubnet(String network, String cidr) {
